@@ -9,7 +9,7 @@ kernel:
 	make -C $(KDIR) M=$(PWD) modules
 
 default:
-	gcc umactable.c -o test
+	gcc main.c umactable.c -o test
 
 clean:
 	rm -rf *.o .cmd *.ko *.mod.c .tmp_versions
