@@ -11,6 +11,8 @@
 #include "mactable.h"
 
 #ifdef DEBUG
+#define setport(mac, port) mactable_setport(mac, port)
+#define getport(mac) mactable_getport(mac)
 
 #define NEXT_FIELD(i) (i+1 >= TABLE_LENGTH ? i+1:0)
 

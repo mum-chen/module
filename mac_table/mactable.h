@@ -8,9 +8,10 @@
 /*******************************************************************************
  * macro type/constant
 *******************************************************************************/
-#ifdef KERNEL_BUILD
+#ifdef __KERNEL__
 #include <linux/types.h>
 #else
+typedef unsigned char	uint8_t;
 typedef unsigned short	uint16_t;
 typedef unsigned long	uint64_t;
 typedef unsigned char	bool;
@@ -29,16 +30,28 @@ typedef unsigned char	bool;
 #define TAG_UNUSED_1	3
 
 #define TABLE_LENGTH	2048
-#define TABLE_USEING_RATE	0.8
-#define VALID_TABLE_LENGTH	(TABLE_LENGTH * TABLE_USEING_RATE)
+#define TABLE_USEING_RATE	8
+#define VALID_TABLE_LENGTH	(TABLE_LENGTH * TABLE_USEING_RATE / 10)
 
 #define AUTO_REMOVE	1
 
 /*******************************************************************************
  * macro function
 *******************************************************************************/
+#define CHAR_AT_MAC(mac, n)	(mac[n])
 
-#define CHAR_AT_MAC(mac, n)	(((0xff << 8 * n) & mac) >> 8 * n)
+#undef PDEBUG
+#ifdef DEBUG_MAC_TABLE
+#  ifdef __KERNEL__
+#    define PDEBUG(fmt, args...)	prink( KERN_DEBUG "mac_table:" fmt, ## args)
+#  else
+#    define PDEBUG(fmt, args...)	fprintf(stderr, fmt, ## args)
+#  endif
+#else
+#  define PDEBUG(fmt, args...)	/* do nothing */
+#endif
+
+
 
 /*******************************************************************************
  * struct define
@@ -82,7 +95,7 @@ struct mac_ctr {
 		for dropping when the hash-table is full.
  */
 struct mac_field {
-	uint64_t mac:48;
+	uint8_t  mac[6];
 	uint16_t tag:2;
 	uint16_t used:2;
 	uint16_t resv:1;
@@ -93,14 +106,16 @@ struct mac_field {
 /*******************************************************************************
  * export function
 *******************************************************************************/
+#ifndef __KERNEL__
 extern int mactable_init();
 extern void mactable_exit();
-extern unsigned char getport(uint64_t mac);
-extern void setport(uint64_t mac, unsigned char port);
+extern uint8_t mactable_getport(uint8_t *mac);
+extern void mactable_setport(uint8_t *mac, uint8_t port);
 
-#ifdef DEBUG
+#  ifdef DEBUG
 void sizeofstruct(void);
 void debug_find(void);
+#  endif
 #endif
 
 #endif /* _MAC_TABLE_H_ */

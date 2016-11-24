@@ -14,6 +14,7 @@
 extern struct mac_ctr	*controller;
 extern struct mac_field	*mactable;
 
+
 /*******************************************************************************
  * debug function
 *******************************************************************************/
@@ -33,26 +34,30 @@ void sizeofstruct(void)
 void debug_charat(struct mac_field f)
 {
 	unsigned char a = CHAR_AT_MAC(f.mac, 1);
-	printf("print mac %lx(0:%x)\n", f.mac, a);
+	printf("print mac %x(0:%x)\n", f.mac, a);
 }
 
 void debug_find(void)
 {
 	/* find empty */
 #if 0
-	printf("empty, port:%u\n", getport(0xa1b1c3));
+	uint8_t mac[6] = { 0xff,  0x11, 0x22, 0x33, 0x44, 0x55,};
+	printf("empty, port:%u\n", getport(mac));
 
 #endif
 
 	/* find exist */
 #if 0
-	setport(0xa1b1c2, 2);
-	setport(0x11111111, 1);
-	setport(0xa1b1c2, 1);
-	setport(0xa1b1c3, 1);
+	uint8_t mac0[6] = { 0xa1,  0xb1, 0xc1, 0x00, 0x00, 0x00,};
+	uint8_t mac1[6] = { 0xff,  0x11, 0x22, 0x33, 0x44, 0x00,};
+	uint8_t mac2[6] = { 0xa1,  0xb1, 0xc2, 0x00, 0x00, 0x00,};
 
-	printf("exist, port:%u\n", getport(0xa1b1c2));
-	printf("exist, port:%u\n", getport(0x11111111));
+	setport(mac0, 1);
+	setport(mac1, 1);
+	setport(mac2, 2);
+
+	printf("exist, port:%u\n", getport(mac1));
+	printf("exist, port:%u\n", getport(mac2));
 #endif
 	/* find conflict */
 #if 0
@@ -78,18 +83,53 @@ void debug_find(void)
 #endif
 
 	/* check autoremove */
-#if 1
+#if 0
+	uint16_t i = 0, n;
+	union {
+		uint16_t number;
+		uint8_t mac[6];
+		
+	} mac_auto1;
+
+	for (i = 0; i < 5; i++)
+		mac_auto1.mac[i] = 0;
+
 
 #define PORT(i)	((i & 0x1) ? 1 : 2)
-	uint16_t i = 0, n;
 	for (i = 0; i < 2000 ;i ++){
-		setport(i, PORT(i));
+		setport(mac_auto1.mac, PORT(i));
+		mac_auto1.number++;
 	}
 
+	mac_auto1.number = 0;
 	for (i = 0; i < 2000 ;i ++){
-		if (getport(i) != PORT(i))
+		if (getport(mac_auto1.mac) != PORT(i))
 			n++;
+			mac_auto1.number++;
 	}
+	printf("n:%u\n", n);
+#endif
+
+	/* check autoremove 2*/
+#if 1
+	uint16_t i = 0, n;
+	union {
+		uint16_t number;
+		uint8_t mac[6];
+		
+	} mac_auto1;
+
+	for (i = 0; i < 5; i++)
+		mac_auto1.mac[i] = 0;
+
+#define PORT(i)	((i & 0x1) ? 1 : 2)
+	for (i = 0; i < 2000 ;i ++){
+		setport(mac_auto1.mac, PORT(i));
+		if (getport(mac_auto1.mac) != PORT(i))
+			n++;
+			mac_auto1.number++;
+	}
+
 	printf("n:%u\n", n);
 #endif
 }

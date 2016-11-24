@@ -1,15 +1,13 @@
-obj-m := kmactable.c                   #要生成的模块名     
-modules-objs:= mymod.o        #生成这个模块名所需要的目标文件
+obj-m := kmactable.o                   #要生成的模块名
+modules-objs:= mactable.o        #生成这个模块名所需要的目标文件
 
-KDIR := /lib/modules/`uname -r`/build   
+#KDIR := /lib/modules/`uname -r`/build
+KDIR := /home/mum-chen/MTK-linux-source
 
 PWD := $(shell pwd)
 
-kernel:
+default:
 	make -C $(KDIR) M=$(PWD) modules
 
-default:
-	gcc main.c umactable.c -o test
-
 clean:
-	rm -rf *.o .cmd *.ko *.mod.c .tmp_versions
+	rm -rf *.o *.*.cmd *.ko *.mod.c .tmp_versions *.order *.symvers

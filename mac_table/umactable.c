@@ -14,14 +14,12 @@
 /* public */
 int mactable_init();
 void mactable_exit();
-unsigned char getport(uint64_t mac);
-void setport(uint64_t mac, unsigned char port);
+uint8_t getport(uint8_t *mac);
+void setport(uint8_t *mac, uint8_t port);
 
-/* private */ static inline long getmac(long mac);
-static bool find(uint64_t mac, uint16_t *result);
-static inline int _setport(struct mac_field *mac);
-static inline int _getport(struct mac_field *mac);
-static uint16_t hashcode(uint64_t mac, uint16_t times);
+/* private */
+static bool find(uint8_t mac[], uint16_t *result);
+static uint16_t hashcode(uint8_t mac[], uint16_t times);
 /*******************************************************************************
  * global variable declare
 *******************************************************************************/
@@ -40,9 +38,13 @@ static struct mac_field	*mactable;
  * private function
 *******************************************************************************/
 
-static inline long getmac(long mac)
+static inline bool maccmp(uint8_t *mac1, uint8_t *mac2)
 {
-	return mac & 0xffffffffffff;
+	int i = 0;
+	for (i = 0; i < 6; i++)
+		if (mac1[i] != mac2[i])
+			return false;
+	return true;
 }
 
 /*------- hash function --------------------------------------------------------
@@ -52,7 +54,6 @@ static inline long getmac(long mac)
  * We can set the m(total num) is power of 2, and let the function h2 always
  * return an odd number.
 --------- hash function ------------------------------------------------------*/
-
 /*
  * @Function:	ELF hash (h1 in doubel hash)
  * --------------------
@@ -64,12 +65,12 @@ static inline long getmac(long mac)
  *
  * @Return:	
  */
-static uint64_t ELF(uint64_t mac)
+static uint64_t ELF(uint8_t *mac)
 {
 	uint64_t hash = 0,x = 0;
 	unsigned char i = 0;
 
-	for (i; i < 6; i++) {
+	for (i = 0 ; i < 6; i++) {
 		hash = (hash << 4) + CHAR_AT_MAC(mac, i);
 		if ((x= hash & 0xF0000000) != 0)
 			hash ^= (x >> 24);
@@ -89,7 +90,7 @@ static uint64_t ELF(uint64_t mac)
  *
  * @Return:	
  */
-static uint64_t BKDR(uint64_t mac)
+static uint64_t BKDR(uint8_t *mac)
 {
 	uint64_t seed = 131;
 	uint64_t hash = 0;
@@ -114,15 +115,16 @@ static uint64_t BKDR(uint64_t mac)
  *
  * @Return:	the hash code is equal to the index of mac-field
  */
-static uint16_t hashcode(uint64_t mac, uint16_t times)
+static uint16_t hashcode(uint8_t *mac, uint16_t times)
 {
 	uint64_t hash;
+	uint16_t idx;
 	if (times)
 		hash = ELF(mac) + BKDR(mac) * times;
 	else
 		hash = ELF(mac);
 
-	uint16_t idx = hash & 0x7ff; /* mod 2^11 */
+	idx = hash & 0x7ff; /* mod 2^11 */
 
 	return idx;
 }
@@ -139,9 +141,10 @@ static uint16_t hashcode(uint64_t mac, uint16_t times)
  * @Return:	if find one field, then return true and the @result will point to that.
 		else return false and the @result will point to an available idx.
  */
-static bool find(uint64_t mac, uint16_t *result)
+static bool find(uint8_t *mac, uint16_t *result)
 {
 	struct mac_field *field = NULL;
+	uint16_t idx = 0xffff, first;
 
 	/* control flage */
 	unsigned char times = 0, setept = false;
@@ -149,16 +152,13 @@ static bool find(uint64_t mac, uint16_t *result)
 	uint16_t empty = 0xffff;
 	
 	/* get the field */
-	uint16_t idx = 0xffff;
 	idx = hashcode(mac, times);
-
+	first = idx;
 	field = &mactable[idx];
-	uint16_t first = idx;
-	
 
 	do{
 		/* find */
-		if (field->used == FIELD_USED && field->mac == mac){
+		if (field->used == FIELD_USED && maccmp(field->mac, mac)){
 			*result = idx;
 			return true;
 		}
@@ -187,65 +187,12 @@ static void autoremove(uint16_t number)
 	for (i = 0; i < number; i++) {
 		field = &mactable[controller->head];
 		if (field->used != FIELD_USED) {
-			printf("error: autoremove mac-table case not used field\n");
+			PDEBUG("error: autoremove mac-table case not used field\n");
 			return ;
 		}
 		controller->head = field->next;
 		field->used = FIELD_DELETED;
 		controller->num--;
-	}
-}
-
-
-static inline int _setport(struct mac_field *field)
-{
-	uint16_t aim_idx = 0xffff;
-	bool ret = find(field->mac, &aim_idx);
-	/* debug
-	printf("mac:%x, aim_idx in _setport:%u\n",field->mac, aim_idx); 
-	*/
-
-	struct mac_field *aim = &mactable[aim_idx];
-	/* exist */
-	if (ret) {
-		aim->tag = field->tag;
-		return true;
-	}
-	/* not find */
-	aim->mac = field->mac;
-	aim->tag = field->tag;
-	aim->used = FIELD_USED;
-	
-	mactable[controller->tail].next = aim_idx;
-	controller->tail = aim_idx;
-
-
-	if (controller->num == 0)
-		controller->head = aim_idx;
-	else if (controller->num >= VALID_TABLE_LENGTH)
-		autoremove(AUTO_REMOVE);
-
-	controller->num++;
-
-#if 0
-	printf("head:%u, tail:%u, number:%u\n",
-			controller->head, controller->tail, controller->num);
-#endif
-	return true;
-}
-
-static inline int _getport(struct mac_field *field)
-{
-	uint16_t aim_idx = 0xffff;
-	bool ret = find(field->mac, &aim_idx);
-	
-	if (ret) {
-		struct mac_field *aim = &mactable[aim_idx];
-		field->tag = aim->tag;
-		return true;
-	} else {
-		field->tag = TAG_UNUSED;
-		return false;
 	}
 }
 
@@ -260,28 +207,58 @@ static inline int _getport(struct mac_field *field)
  * @Param:	
  *  mac:	only get the last 48bit
  *  port:	only get the last 2bit
- *
- * @Return:	
+ * * @Return:	
  */
-void setport(uint64_t mac, unsigned char port)
+void mactable_setport(uint8_t *mac, uint8_t port)
 {
-	struct mac_field field = {
-		.mac = getmac(mac),
-		.tag = port & 0x3,
-	};
+	uint16_t aim_idx = 0xffff;
+	bool ret = find(mac, &aim_idx);
 
-	bool ret = _setport(&field);
+	uint8_t tag = port & 0x3;
+#if 0 // debug
+	PDEBUG("mac:%x, aim_idx in _setport:%u\n",field->mac, aim_idx); 
+#endif
+
+	struct mac_field *aim = &mactable[aim_idx];
+	/* aim exist */
+	if (ret) {
+		aim->tag = tag;
+		return;
+	}
+	/* aim not find */
+	memcpy(aim->mac, mac, sizeof(uint8_t)*6);
+	aim->tag = tag;
+	aim->used = FIELD_USED;
+	
+	mactable[controller->tail].next = aim_idx;
+	controller->tail = aim_idx;
+
+	if (controller->num == 0)
+		controller->head = aim_idx;
+	else if (controller->num >= VALID_TABLE_LENGTH)
+		autoremove(AUTO_REMOVE);
+
+	controller->num++;
+
+#if 0
+	PDEBUG("head:%u, tail:%u, number:%u\n",
+			controller->head, controller->tail, controller->num);
+#endif
 }
 
-unsigned char getport(uint64_t mac)
+uint8_t mactable_getport(uint8_t *mac)
 {
-	struct mac_field field = {
-		.mac = getmac(mac),
-	};
+	struct mac_field field;
 
-	_getport(&field);
+	uint16_t aim_idx = 0xffff;
+	bool ret = find(mac, &aim_idx);
 	
-	return field.tag;
+	if (ret) {
+		struct mac_field *aim = &mactable[aim_idx];
+		return aim->tag;
+	} else {
+		return TAG_UNUSED;
+	}
 }
 
 int mactable_init(void)

@@ -18,9 +18,15 @@ int loop()
 
 int main()
 {
+	uint64_t mac_64 = 0;
+	uint8_t mac[6] = { 0xff,  0x11, 0x22, 0x33, 0x44, 0x55,};
+
 	mactable_init();
+
 #ifdef DEBUG
-	// sizeofstruct();
+	// mac_64 = transmac(mac);
+	// PDEBUG("\n");
+	sizeofstruct();
 	debug_find();
 #endif
 
